@@ -1,0 +1,124 @@
+version: '3.4'
+
+services:
+  ordinance-rest:
+    image: sima-ordinance
+    build:
+      context: .
+      dockerfile: .docker/Dockerfile
+    environment:
+      FLASK_ENV: ${FLASK_ENV}
+      MONGO_HOST: mongodb-primary
+      MONGO_PORT: 27017
+      MONGO_DB: ${MONGO_DB}
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASSWORD: ${MONGO_PASSWORD}
+      KAFKA_SERVER: kafka:9093
+      SCHEDULE_INTERVAL: ${SCHEDULE_INTERVAL:-60000}
+      INTROSPECTION_URI: http://auth-rest:5000/api/v1/auth/session/instrospect
+    ports:
+      - ${REST_PORT:-5000}:5000
+    volumes:
+      - .:/app
+    depends_on:
+      - mongodb-primary
+    networks:
+      - ordinance-network
+    entrypoint: ['python', 'main.py', 'start-flask-server']
+
+  ordinance-kafka:
+    image: sima-ordinance
+    build:
+      context: .
+      dockerfile: .docker/Dockerfile
+    environment:
+      MONGO_HOST: mongodb-primary
+      MONGO_PORT: 27017
+      MONGO_DB: ${MONGO_DB}
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASSWORD: ${MONGO_PASSWORD}
+      KAFKA_SERVER: kafka:9093
+    volumes:
+      - .:/app
+    depends_on:
+      - mongodb-primary
+      - kafka
+    networks:
+      - ordinance-network
+    entrypoint: ['python', 'main.py', 'start-kafka-consumer']
+
+  mongodb-primary:
+    image: 'bitnami/mongodb:5.0'
+    environment:
+      - MONGODB_ADVERTISED_HOSTNAME=mongodb-primary
+      - MONGODB_REPLICA_SET_MODE=primary
+      - MONGODB_ROOT_USER=$MONGO_USER
+      - MONGODB_ROOT_PASSWORD=$MONGO_PASSWORD
+      - MONGODB_REPLICA_SET_KEY=$MONGO_PASSWORD
+    ports:
+      - ${MONGO_PORT:-27017}:27017
+    volumes:
+      - 'ordinance-data:/bitnami'
+    networks:
+      - ordinance-network
+  mongodb-secondary:
+    image: 'bitnami/mongodb:5.0'
+    depends_on:
+      - mongodb-primary
+    environment:
+      - MONGODB_ADVERTISED_HOSTNAME=mongodb-secondary
+      - MONGODB_REPLICA_SET_MODE=secondary
+      - MONGODB_INITIAL_PRIMARY_HOST=mongodb-primary
+      - MONGODB_INITIAL_PRIMARY_PORT_NUMBER=27017
+      - MONGODB_INITIAL_PRIMARY_ROOT_PASSWORD=$MONGO_PASSWORD
+      - MONGODB_REPLICA_SET_KEY=$MONGO_PASSWORD
+    networks:
+      - ordinance-network
+
+  mongodb-arbiter:
+    image: 'bitnami/mongodb:5.0'
+    depends_on:
+      - mongodb-primary
+    environment:
+      - MONGODB_ADVERTISED_HOSTNAME=mongodb-arbiter
+      - MONGODB_REPLICA_SET_MODE=arbiter
+      - MONGODB_INITIAL_PRIMARY_HOST=mongodb-primary
+      - MONGODB_INITIAL_PRIMARY_PORT_NUMBER=27017
+      - MONGODB_INITIAL_PRIMARY_ROOT_PASSWORD=$MONGO_PASSWORD
+      - MONGODB_REPLICA_SET_KEY=$MONGO_PASSWORD
+    networks:
+      - ordinance-network
+  zookeeper:
+    image: confluentinc/cp-zookeeper:6.2.0
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - ordinance-network
+
+  kafka:
+    image: confluentinc/cp-kafka:6.2.0
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    ports:
+      - ${KAFKA_PORT:-9092}:9092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9093,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - ordinance-network
+
+volumes:
+  ordinance-data:
+    name: ordinance-service_ordinance-network
+    driver: local
+
+networks:
+  ordinance-network:
+    driver: bridge
