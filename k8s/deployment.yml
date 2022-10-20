@@ -29,7 +29,7 @@ spec:
         resources:
           limits:
             memory: "256Mi"
-            cpu: "100m"
+            cpu: "50m"
       - name: ordinance-kafka
         image: $REGISTRY-docker.pkg.dev/$PROJECT_ID/sima/ordinance:$IMAGE_TAG
         imagePullPolicy: Always
