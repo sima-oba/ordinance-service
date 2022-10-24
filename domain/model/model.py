@@ -14,11 +14,11 @@ class Model:
         return asdict(self)
 
     def merge(self, data: dict):
-        merged = dict(
-            updated_at=datetime.utcnow(),
+        merged = {
+            'updated_at': datetime.utcnow(),
             **self.asdict(),
             **data
-        )
+        }
 
         return from_dict(self.__class__, merged)
 
