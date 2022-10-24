@@ -24,7 +24,7 @@ class Model:
 
     @classmethod
     def new(cls, data: dict):
-        _id = data.get('_id') or str(uuid4())
+        _id = data.pop('_id', None) or str(uuid4())
         now = datetime.utcnow()
 
         return cls(
