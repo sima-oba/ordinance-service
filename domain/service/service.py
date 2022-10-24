@@ -43,6 +43,12 @@ class Service:
 
     def create_owner(self, data: dict):
         owner = self._repo.find_owner_by_id(data['_id'])
+        data = {
+            '_id': data['_id'],
+            'doc': data['doc'],
+            'email': data['email'],
+            'name': data['name']
+        }
 
         if owner is None:
             owner = Owner.new(data)
