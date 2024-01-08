@@ -16,4 +16,5 @@ python-dotenv==0.19.1
 regex==2021.8.28
 requests==2.22.0
 typing-extensions==3.10.0.2
+tzlocal==2.1
 Werkzeug==2.3.7
